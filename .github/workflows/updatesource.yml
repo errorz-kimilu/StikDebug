@@ -36,7 +36,7 @@ jobs:
 
     - name: Debug repository information
       run: |
-        echo "Repository: 0-Blu/StikJIT"
+        echo "Repository: errorzkimilu/StikJIT"
         echo "Event name: $GITHUB_EVENT_NAME"
         echo "Current directory: $(pwd)"
         echo "Repository contents:"
