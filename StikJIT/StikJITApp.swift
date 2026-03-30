@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Network
-import UniformTypeIdentifiers
+import idevice
 
 // Register default settings before the app starts
 private func registerAdvancedOptionsDefault() {
@@ -117,24 +117,25 @@ class DNSChecker: ObservableObject {
 
 // MARK: - Main App
 
-// Global state variable for the heartbeat response.
-var pubHeartBeat = false
-private var heartbeatStartPending = false
-private var heartbeatStartInProgress = false
-private var heartbeatPendingShowUI = true
+// Global state variable for the tunnel connection.
+var pubTunnelConnected = false
+private var tunnelStartPending = false
+private var tunnelStartInProgress = false
+private var tunnelPendingShowUI = true
 
 @main
 struct HeartbeatApp: App {
     @StateObject private var mount = MountingProgress.shared
     @Environment(\.scenePhase) private var scenePhase   // Observe scene lifecycle
-    @State private var shouldAttemptHeartbeatRestart = false
+    @State private var shouldAttemptTunnelReconnect = false
     
     init() {
         registerAdvancedOptionsDefault()
         if UserDefaults.standard.bool(forKey: "keepAliveAudio") {
             BackgroundAudioManager.shared.start()
         }
-        if let fixMethod  = class_getInstanceMethod(UIDocumentPickerViewController.self, #selector(UIDocumentPickerViewController.fix_init(forOpeningContentTypes:asCopy:))),
+        let fixSelector = NSSelectorFromString("fix_initForOpeningContentTypes:asCopy:")
+        if let fixMethod  = class_getInstanceMethod(UIDocumentPickerViewController.self, fixSelector),
            let origMethod = class_getInstanceMethod(UIDocumentPickerViewController.self, #selector(UIDocumentPickerViewController.init(forOpeningContentTypes:asCopy:))) {
             method_exchangeImplementations(origMethod, fixMethod)
         }
@@ -144,11 +145,11 @@ struct HeartbeatApp: App {
     private func handleScenePhaseChange(_ newPhase: ScenePhase) {
         switch newPhase {
         case .background:
-            shouldAttemptHeartbeatRestart = true
+            shouldAttemptTunnelReconnect = true
         case .active:
-            if shouldAttemptHeartbeatRestart {
-                shouldAttemptHeartbeatRestart = false
-                startHeartbeatInBackground(showErrorUI: false)
+            if shouldAttemptTunnelReconnect {
+                shouldAttemptTunnelReconnect = false
+                startTunnelInBackground(showErrorUI: false)
             }
         default:
             break
@@ -177,7 +178,7 @@ struct HeartbeatApp: App {
                         }
                     }
                 }
-            .onChange(of: scenePhase) { newPhase in
+            .onChange(of: scenePhase) { _, newPhase in
                 handleScenePhaseChange(newPhase)
             }
         }
@@ -269,43 +270,43 @@ class MountingProgress: ObservableObject {
 }
 
 func isPairing() -> Bool {
-    let pairingpath = URL.documentsDirectory.appendingPathComponent("pairingFile.plist").path
-    var pairingFile: IdevicePairingFile?
-    let err = idevice_pairing_file_read(pairingpath, &pairingFile)
+    let pairingpath = PairingFileStore.prepareURL().path
+    var pairingFile: RpPairingFileHandle?
+    let err = rp_pairing_file_read(pairingpath, &pairingFile)
     if err != nil { return false }
-    idevice_pairing_file_free(pairingFile)
+    rp_pairing_file_free(pairingFile)
     return true
 }
 
-func startHeartbeatInBackground(showErrorUI: Bool = true) {
-    assert(Thread.isMainThread, "startHeartbeatInBackground must be called on the main thread")
-    let pairingFileURL = URL.documentsDirectory.appendingPathComponent("pairingFile.plist")
-    
+func startTunnelInBackground(showErrorUI: Bool = true) {
+    assert(Thread.isMainThread, "startTunnelInBackground must be called on the main thread")
+    let pairingFileURL = PairingFileStore.prepareURL()
+
     guard FileManager.default.fileExists(atPath: pairingFileURL.path) else {
-        heartbeatStartPending = false
-        heartbeatPendingShowUI = true
+        tunnelStartPending = false
+        tunnelPendingShowUI = true
         return
     }
-    
-    guard !heartbeatStartInProgress else {
+
+    guard !tunnelStartInProgress else {
         return
     }
-    
-    heartbeatStartPending = false
-    heartbeatPendingShowUI = true
-    heartbeatStartInProgress = true
-    
+
+    tunnelStartPending = false
+    tunnelPendingShowUI = true
+    tunnelStartInProgress = true
+
     DispatchQueue.global(qos: .userInteractive).async {
         defer {
             DispatchQueue.main.async {
-                heartbeatStartInProgress = false
+                tunnelStartInProgress = false
             }
         }
         do {
-            try JITEnableContext.shared.startHeartbeat()
-            LogManager.shared.addInfoLog("Heartbeat started successfully")
-            pubHeartBeat = true
-            
+            try JITEnableContext.shared.startTunnel()
+            LogManager.shared.addInfoLog("Tunnel connected successfully")
+            pubTunnelConnected = true
+
             DispatchQueue.main.async {
                 let trustcachePath = URL.documentsDirectory.appendingPathComponent("DDI/Image.dmg.trustcache").path
                 guard FileManager.default.fileExists(atPath: trustcachePath),
@@ -321,12 +322,12 @@ func startHeartbeatInBackground(showErrorUI: Bool = true) {
             DispatchQueue.main.async {
                 if code == -9 {
                     do {
-                        try FileManager.default.removeItem(at: URL.documentsDirectory.appendingPathComponent("pairingFile.plist"))
+                        try PairingFileStore.remove()
                         LogManager.shared.addInfoLog("Removed invalid pairing file")
                     } catch {
                         LogManager.shared.addErrorLog("Failed to remove invalid pairing file: \(error.localizedDescription)")
                     }
-                    
+
                     showAlert(
                         title: "Invalid Pairing File",
                         message: "The pairing file is invalid or expired. Please select a new pairing file.",
@@ -338,14 +339,14 @@ func startHeartbeatInBackground(showErrorUI: Bool = true) {
                     }
                 } else {
                     showAlert(
-                        title: "Heartbeat Error",
+                        title: "Connection Error",
                         message: "\(error.localizedDescription)\n\nMake sure Wi‑Fi and LocalDevVPN are connected and that the device is reachable.",
                         showOk: false,
                         showTryAgain: true
                     ) { shouldTryAgain in
                         if shouldTryAgain {
                             DispatchQueue.main.async {
-                                startHeartbeatInBackground()
+                                startTunnelInBackground()
                             }
                         }
                     }

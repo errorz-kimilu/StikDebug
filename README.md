@@ -44,7 +44,7 @@
    <a href="https://stikstore.app/altdirect/?url=https://stikdebug.xyz/index.json" target="_blank">
      <img src="https://github.com/stikstore/altdirect/blob/main/assets/png/AltSource_Blue.png" alt="Add AltSource" width="200">
    </a>
-   <a href="https://github.com/StephenDev0/StikDebug/releases/download/3.0.1/StikDebug-3.0.1.ipa" target="_blank">
+   <a href="https://github.com/StephenDev0/StikDebug/releases/download/3.1.0/StikDebug-3.1.0.ipa" target="_blank">
      <img src="https://github.com/stikstore/altdirect/blob/main/assets/png/Download_Blue.png" alt="Download .ipa" width="200">
    </a>
 </div>
@@ -55,9 +55,7 @@
 |--------------------------|----------------------|-----------------------------------------------------------------------|
 | 1.0 – 17.3.X             | Not supported        | Uses Different Connection Protocols                                   |
 | 17.4 – 18.x              | Fully supported      | Stable                                                                |
-| 26.0 – 26.3              | Supported            | Limited App Availability (Developers need to update their apps to work.) |
-| 26.4 Developer Beta 1    | Critical issues   | lockdownd drops connections → JIT broken; do not update                  |
-| iOS 26.4+ betas / future | Untested / partial   | Check [Discord](https://discord.gg/ZnNcrRT3M8), [releases](https://github.com/StephenDev0/StikDebug/releases), or [@StephenDev0 on X](https://x.com/stephendev0) for updates |
+| 26.0+              | Supported            | Limited App Availability (Developers need to update their apps to work.) |
 
 ## How to Enable JIT
 
